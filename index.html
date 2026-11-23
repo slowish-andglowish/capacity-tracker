@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#4a3d5c">
+<title>Capacity Tracker</title>
+<style>
+/* VOICE everyday tool, calm and plain, quick to use when tired
+   IDEA a dusk-toned daily ledger: one bar per day filling toward 100
+   PICTURE today's load bar, large: woke-up load, drains, restores paid back, 100 line
+   COLOUR dusk: pale lilac-grey ground, muted plum band, soft plum drains, grey-violet restores; deep plum night
+   TYPE the device's own fonts, rounded where available, so nothing loads from outside
+   LAYOUT title band with tabs; bar first, then pick lists; stacks to one column under 600px */
+:root{color-scheme:light dark;--bg:light-dark(#f6f3f7,#1b1720);--ink:light-dark(#2a2233,#ede7f2);--mut:light-dark(#695e74,#b1a7bc);--line:light-dark(#ddd5e2,#3a3145);--panel:light-dark(#ece6f0,#251f2d);--ind:light-dark(#5f5893,#b8afe2);--band:light-dark(#4a3d5c,#2a2236);--dr:light-dark(#9c4f71,#d58cab);--wake:light-dark(#aaa0b5,#6c6278)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+html{scroll-padding-top:72px}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow-x:clip}
+h1,h2,h3,.num{font-family:ui-rounded,"SF Pro Rounded",system-ui,sans-serif;letter-spacing:-.02em}
+.band{padding:clamp(20px,3vw,36px) max(5vw,16px)}
+.wrap{max-width:1100px;margin:0 auto}
+header{background:var(--band);color:#fff}
+header h1{margin:0;font-size:clamp(30px,4vw,44px);line-height:1.05}
+header p{margin:6px 0 0;color:#ddd2e6;max-width:60ch}
+nav{display:flex;flex-wrap:wrap;gap:6px;margin-top:18px}
+nav a{color:#fff;text-decoration:none;padding:10px 14px;border-radius:999px;border:1px solid #ffffff40;min-height:44px;display:inline-flex;align-items:center}
+nav a[aria-current=page]{background:#fff;color:#4a3d5c;font-weight:600}
+nav a:focus-visible,button:focus-visible,input:focus-visible,label:focus-within{outline:3px solid var(--dr);outline-offset:2px}
+.status{font-size:13px;color:#ddd2e6;margin-top:10px}
+section[data-view]{display:none}section[data-view].on{display:block}
+h2{font-size:28px;line-height:1.1;margin:0 0 6px}
+h3{font-size:19px;margin:22px 0 8px}
+.mut{color:var(--mut)}
+.small{font-size:13px}
+.day{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+button{font:inherit;color:inherit;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 14px;min-height:44px;cursor:pointer}
+button:hover{border-color:var(--ind)}
+button.pri{background:var(--ind);color:var(--bg);border-color:var(--ind)}
+.meter{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:clamp(16px,3vw,28px)}
+.big{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.big .num{font-size:clamp(56px,9vw,96px);line-height:1;font-weight:700}
+.big .of{font-size:22px;color:var(--mut)}
+.big .word{font-size:20px;font-weight:600}
+.track{position:relative;height:56px;border-radius:12px;background:var(--bg);border:1px solid var(--line);margin:18px 0 8px;overflow:hidden}
+.seg{position:absolute;top:0;bottom:0;transition:width .35s,left .35s}
+.s-wake{background:repeating-linear-gradient(135deg,var(--wake) 0 6px,transparent 6px 11px)}
+.s-dr{background:var(--dr)}
+.s-rs{background:repeating-linear-gradient(135deg,var(--ind) 0 6px,color-mix(in srgb,var(--ind) 35%,transparent) 6px 11px)}
+.cap{position:absolute;top:-4px;bottom:-4px;width:3px;background:var(--ink)}
+.scale{display:flex;justify-content:space-between;font-size:13px;color:var(--mut)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(9em,1fr));gap:10px;margin-top:14px}
+.stat{border-left:4px solid var(--line);padding:2px 10px}
+.stat b{display:block;font-family:ui-rounded,system-ui,sans-serif;font-size:24px}
+.k-wake{border-color:var(--wake)}.k-dr{border-color:var(--dr)}.k-rs{border-color:var(--ind)}
+.wakes{display:flex;flex-wrap:wrap;gap:6px}
+.wakes button[aria-pressed=true],.chip[aria-pressed=true]{background:var(--ind);color:var(--bg);border-color:var(--ind)}
+.grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:clamp(16px,3vw,32px);margin-top:8px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border-radius:999px;padding:8px 12px;text-align:left}
+.chip small{color:inherit;opacity:.75;margin-left:4px;white-space:nowrap}
+.chip.edit[aria-pressed=true]{background:var(--ind);border-color:var(--ind);color:var(--bg)}
+.chip.edit[aria-pressed=false]{border-style:dashed}
+.drains .chip:not(.edit)[aria-pressed=true]{background:var(--dr);border-color:var(--dr);color:#fff}
+.grp{font-size:13px;color:var(--mut);margin:14px 0 6px;font-weight:600}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line);vertical-align:middle}
+td.n,th.n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.seg3{display:inline-flex;gap:4px;flex-wrap:wrap}.seg3 button{min-height:36px;padding:4px 10px;font-size:14px}.seg3 button[aria-pressed=true]{background:var(--ind);color:var(--bg);border-color:var(--ind)}
+.step{display:inline-flex;align-items:center;gap:4px}
+.step button{min-height:36px;min-width:36px;padding:0}
+textarea,input[type=text],input[type=number],select{font:inherit;font-size:16px;color:inherit;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:9px 10px;min-height:44px}
+textarea{width:100%;min-height:70px}
+input[type=number]{width:5.5em}
+.checks{display:grid;gap:4px}
+.checks label{display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border-radius:10px;cursor:pointer}
+.checks label:hover{background:var(--panel)}
+.checks input{width:20px;height:20px;margin-top:2px;flex:none;accent-color:var(--ind)}
+.note{background:color-mix(in srgb,var(--dr) 12%,var(--bg));border-left:4px solid var(--dr);padding:10px 14px;border-radius:8px;margin:14px 0}
+.scroll{overflow-x:auto}
+.fig{position:relative;min-height:300px}.fig>svg{position:absolute;inset:0;width:100%;height:100%}
+svg text{font:13px system-ui,sans-serif;fill:var(--mut);paint-order:stroke;stroke:var(--bg);stroke-width:4px}
+.add{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px}
+.add input[type=text]{flex:1 1 14em}
+.btnlike{display:inline-flex;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 14px;min-height:44px;cursor:pointer}
+.dialog{position:fixed;inset:0;background:#0008;display:none;place-items:center;padding:16px;z-index:5}
+.dialog.on{display:grid}
+.dialog div{background:var(--bg);border-radius:14px;padding:20px;max-width:420px}
+@media(max-width:700px){.grid2{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:600px){table{font-size:14px}th,td{padding:6px 4px}.cat-tbl thead{display:none}.cat-tbl tr{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;padding-block:8px;border-bottom:1px solid var(--line)}.cat-tbl td{border:0;padding:0}.cat-tbl td:first-child{grid-column:1/-1}}
+@media(prefers-reduced-motion:reduce){.seg{transition:none}}
+</style>
+</head>
+<body>
+<header class="band"><div class="wrap">
+<h1>Capacity Tracker</h1>
+<p>A daily record of what ordinary days cost you, and what gives some back.</p>
+<nav id="nav">
+<a href="#today">Today</a><a href="#checkin">Check-in</a><a href="#catalogue">My catalogue</a><a href="#record">Record</a><a href="#how">How it works</a>
+</nav>
+<div class="status" id="status">Loading your record.</div>
+</div></header>
+
+<main class="band"><div class="wrap">
+
+<section data-view="today">
+<div class="day">
+<button id="prev" aria-label="Previous day">&larr;</button>
+<h2 id="dayname" style="margin:0"></h2>
+<button id="next" aria-label="Next day">&rarr;</button>
+<button id="gotoday">Today</button>
+</div>
+<div class="meter">
+<div class="big"><span class="num" id="total">0</span><span class="of">out of 100</span><span class="word" id="word"></span></div>
+<div class="track" id="track" aria-hidden="true"><div class="seg s-wake" id="sWake"></div><div class="seg s-dr" id="sDr"></div><div class="seg s-rs" id="sRs"></div><div class="cap" id="cap"></div></div>
+<div class="scale"><span>0, nothing taken</span><span>100, completely drained</span></div>
+<div class="stats">
+<div class="stat k-wake"><span class="small mut">Woke up at</span><b id="vWake">0</b></div>
+<div class="stat k-dr"><span class="small mut">Drains</span><b id="vDr">0</b></div>
+<div class="stat k-rs"><span class="small mut">Restored</span><b id="vRs">0</b></div>
+</div>
+</div>
+<h3>How drained were you when you woke up?</h3>
+<div class="wakes" id="wakes"></div>
+<div class="scale" style="margin-top:6px"><span>0, fully rested</span><span>100, can’t get out of bed</span></div>
+<div class="add"><button id="editBtn">Edit my list</button><span class="small mut" id="editHelp"></span></div>
+<div class="grid2">
+<div class="drains"><h3>What cost me today</h3><div id="dChips"></div></div>
+<div><h3>What gave some back</h3><div id="rChips"></div></div>
+</div>
+<div id="todayTbl"></div>
+<h3>Note</h3>
+<textarea id="note" placeholder="Anything worth remembering about today"></textarea>
+</section>
+
+<section data-view="checkin">
+<h2>Check-in</h2>
+<p class="mut">Tick whatever is true today. Nothing is timed.</p>
+<div id="calib"></div>
+<div class="grid2">
+<div><h3>Signs I'm running low</h3><div id="lowList"></div></div>
+<div><h3>Signs I'm doing well</h3><div class="checks" id="wellList"></div></div>
+</div>
+</section>
+
+<section data-view="catalogue">
+<h2>My catalogue</h2>
+<p class="mut">Everything that costs you or restores you, with your own ratings from 1 to 100. A rating of 100 means that thing alone would leave you completely drained. Only items marked "Show" appear on the Today page.</p>
+<div class="add">
+<input type="text" id="search" placeholder="Search the catalogue" aria-label="Search the catalogue">
+<button id="showAll">Show everything</button>
+</div>
+<div id="catBody"></div>
+<h3>Add your own</h3>
+<div class="add">
+<input type="text" id="newName" placeholder="For example, a fork with three prongs" aria-label="New item name">
+<select id="newKind" aria-label="Kind"><option value="d">Costs me</option><option value="r">Gives back</option></select>
+<input type="number" id="newCost" min="1" max="100" value="10" aria-label="Rating 1 to 100">
+<button class="pri" id="addBtn">Add</button>
+</div>
+<p><button id="resetBtn">Reset catalogue to the starting list</button></p>
+</section>
+
+<section data-view="record">
+<h2 id="recTitle">Record</h2>
+<p class="mut" id="recSub"></p>
+<div class="fig" id="fig"><svg id="chart" role="img" aria-label="End-of-day load for each of the last 14 days"></svg></div>
+<div class="stats" id="recStats"></div>
+<h3>What cost you most, last 14 days</h3>
+<div id="topList"></div>
+<h3>Export and back up</h3>
+<p class="mut">Your entries are kept on this device only. Download a CSV to keep or give to a psychologist or doctor. Back up regularly, and use Restore to move your record to a new device.</p>
+<div class="add"><button id="dlBtn" class="pri">Download CSV</button><button id="bkBtn">Back up</button><label class="btnlike" for="rsFile">Restore a backup</label><input type="file" id="rsFile" accept=".json,application/json" hidden><button id="copyBtn">Copy as text</button><span id="expMsg" class="small mut"></span></div>
+</section>
+
+<section data-view="how">
+<h2>How it works</h2>
+<p>Ordinary days cost neurodivergent people more than they cost other people, and the cost is easy to miss until it has built up. This record makes it visible.</p>
+<h3>The scale</h3>
+<p>Each day runs from 0 to 100, where 100 means completely drained. You start each day at the level you woke up with. Each thing that costs you adds its rating, and each thing that restores you takes its rating off. Ratings are yours: change them in your catalogue at any time, or mark something as hitting harder today.</p>
+<h3>The rule</h3>
+<p>Once a day, under a minute, and skipping a day costs nothing. A tracker that asks too much becomes another drain.</p>
+<h3>Your privacy and your data</h3>
+<p><b>You don't need an account.</b> There's no sign-up, no name and no email. Open the link and start using it.</p>
+<p><b>Your entries are saved on your device, in your browser.</b> They are never sent anywhere. Nobody else can see them, including the person who made the app. The app has no tracking, no advertising and no outside connections.</p>
+<p><b>Each device and browser keeps its own record.</b> If you use it on your phone and your laptop, those are two separate records. In a private or incognito window, everything is deleted when you close the window.</p>
+<p><b>Clearing your browser's data deletes your record.</b> On iPhone and iPad, Safari can also delete it if you don't open the page for a week or more. Adding the app to your home screen stops that happening.</p>
+<p><b>Back up regularly.</b> On the Record page, tap "Back up" to download a backup file ending in .json. It holds everything: your catalogue, your ratings and every day you have recorded. It is not meant to be opened, only used to restore the app. Keep it somewhere safe, such as your email or cloud storage. To move to a new phone or recover your record, open the app there and tap "Restore a backup."</p>
+<p><b>You choose who sees it.</b> "Download CSV" makes a table of your days that opens in Excel, Numbers or Google Sheets, to keep or give to a psychologist or doctor. A CSV cannot be used to restore the app. Nothing is shared unless you do it. Anyone who uses the same device and browser can open your record, so keep that in mind on a shared device.</p>
+<p><b>To add it to your home screen:</b> on iPhone or iPad, open the link in Safari, tap the Share button, then "Add to Home Screen." On Android, open the link in Chrome, tap the menu, then "Add to Home screen."</p>
+<p><b>What it is:</b> a way to see what ordinary days cost you and what gives some back. The starting ratings are estimates. Change them to match your own experience. It isn't a medical or diagnostic tool.</p>
+<h3>What it draws on</h3>
+<p class="mut">Daily hassles research (Kanner and colleagues, 1981; Almeida and colleagues, 2002), autistic burnout research (Raymaker and colleagues, 2020), energy accounting (Toudal and Attwood), spoon theory (Miserandino) and battery theory (Becker), and lived experience. Starting ratings are estimates to adjust, not measurements. All lists are written in our own words.</p>
+</section>
+
+</div></main>
+<div class="dialog" id="dlg" role="dialog" aria-modal="true"><div><p id="dlgText"></p><div class="add"><button class="pri" id="dlgYes">Yes</button><button id="dlgNo">Cancel</button></div></div></div>
+
+<script>
+{
+const DC={sens:'Sensory',soc:'Social and masking',unc:'Uncertainty and change',think:'Thinking and organising',dem:'Demands',body:'Body',own:'My own'};
+const RC={alone:'Solitude and low demand',int:'Interests',sense:'Sensory input I chose',move:'Movement and outdoors',conn:'Connection on my terms',rbody:'Body and routine',own:'My own'};
+const SEED=[
+['d','sens','noise','Noise I hated',20,1],['d','sens','echo','A loud or echoing space',15,0],['d','sens','light','Bright, flickering or fluorescent light',10,1],['d','sens','smell','Strong smells',10,0],['d','sens','crowd','A crowd, or being bumped or touched',20,1],['d','sens','clothes','Clothes or shoes that bothered me',8,0],['d','sens','temp','Too hot or too cold, and couldn’t change it',8,0],['d','sens','overtalk','People talking over each other',12,0],['d','sens','utensil','A utensil, cup or object that felt wrong',5,1],['d','sens','assembly','An assembly or big gathering',25,0],
+['d','soc','face','Monitoring my face',15,1],['d','soc','eyes','Eye contact I didn’t want',10,0],['d','soc','small','Small talk',10,1],['d','soc','nobreak','Around people with no break',20,1],['d','soc','mono','Listening to someone think out loud',12,0],['d','soc','hide','Hiding how I felt',15,1],['d','soc','meaning','Working out what people really meant',10,0],['d','soc','group','A group conversation',15,0],['d','soc','phone','A phone call',10,0],['d','soc','replay','Replaying an embarrassing or shameful moment',15,1],['d','soc','conflict','Conflict, or someone’s anger',25,1],
+['d','unc','wait','Waiting without knowing what would happen',10,0],['d','unc','plan','A plan changed or cancelled',10,1],['d','unc','new','Somewhere new or unfamiliar',15,0],['d','unc','interrupt','Interrupted while focused',5,1],['d','unc','switch','Switching activities when I didn’t choose to',5,0],['d','unc','meeting','An unexpected meeting or appointment',10,0],['d','unc','hassle','A minor hassle, such as lost keys or traffic',5,0],
+['d','think','decide','Lots of decisions',10,1],['d','think','others','Keeping track of things for other people',10,0],['d','think','admin','Admin, forms or emails',10,1],['d','think','start','Pushing myself to start something',10,0],['d','think','format','Working in a hard format, such as reading, handwriting or speaking',15,0],['d','think','food','Deciding what to eat',5,0],
+['d','dem','sched','Following someone else’s schedule',15,0],['d','dem','judged','Being watched, tested or judged',20,0],['d','dem','told','Doing what I was told rather than chose',10,0],
+['d','body','nofood','Went without food for most of the day',15,1],['d','body','pain','In pain or unwell',20,0],['d','body','toilet','Held on when I needed the toilet',5,0],['d','body','badsleep','Slept badly last night',20,1],['d','body','meds','Medication wore off with things still to do',10,0],
+['r','alone','alone','Time alone, with nobody needing anything',15,1],['r','alone','quiet','Somewhere quiet',10,0],['r','alone','dim','Somewhere dim or dark',10,1],['r','alone','empty','Nothing scheduled',15,0],
+['r','int','special','My special interest',15,1],['r','int','make','Made or built something',10,0],['r','int','chose','Read, watched or learned something I chose',10,0],['r','int','familiar','Rewatched or replayed something familiar',8,0],
+['r','sense','heat','Heat, such as a sauna or bath',10,0],['r','sense','cold','Cold, such as a cold plunge or the ocean',10,0],['r','sense','music','Loud music with nobody else there',10,0],['r','sense','pressure','Deep pressure, such as a weighted blanket',8,0],['r','sense','stim','Stimmed without hiding it',8,0],
+['r','move','moved','Moved my body in a way I chose',10,1],['r','move','outdoors','Outdoors or in nature',10,1],['r','move','water','In or near water',10,0],
+['r','conn','pets','Time with my pets',8,1],['r','conn','nomask','With someone I don’t have to mask around',10,0],['r','conn','side','Side by side with someone, without having to talk',8,0],['r','conn','writing','Talked in writing rather than out loud',5,0],['r','conn','laugh','Laughed properly',8,0],
+['r','rbody','expected','The day went the way I expected',10,0],['r','rbody','liked','Ate food I actually liked',5,0],['r','rbody','rested','Lay down and rested',10,1],['r','rbody','slept','Slept well last night',15,0]
+].map(([kind,cat,id,name,cost,show])=>({kind,cat,id,name,cost,show:!!show}));
+const LOW={Body:['A headache, stomach ache or other pain','Grinding my teeth, or my jaw is tight','My heart is racing or my chest feels tight','Getting sick more often','Sleeping much more or much less than usual','Eating much more or much less than usual'],Mind:['Everything feels too much, even small things','Can’t concentrate or remember things','Can’t make decisions','Things I usually enjoy feel flat','Thinking badly about myself','My sense of humour has gone','Uneasy or anxious without a clear reason'],'Senses and communication':['Noise, light or touch bother me more than usual','Talking is harder, or words won’t come','Stimming more, or needing to','Had a shutdown or meltdown'],'What I’m doing':['Avoiding people','Snapping at people','Can’t do things I can usually do','Skipping showers, teeth or other routines','More caffeine or sugar to keep going','Picking at my skin or pulling my hair','Cancelled plans or called in sick']};
+const WELL=['I can start things without a big push','My mood is steady','Bad feelings pass fairly quickly','I want to be around people','I can relax','Not stuck on the past or worrying about the future','I feel hopeful','Comfortable being myself','Energy in my body and my head','Laughing easily','Unplanned things don’t throw me much','Humming or singing to myself','Routines are easy to keep up','Sleeping well','My interests feel exciting','Noise and crowds bother me less than usual'];
+const LOWFLAT=Object.values(LOW).flat();
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const $=id=>document.getElementById(id);
+const iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const fromIso=s=>{const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)};
+const addDays=(s,n)=>{const d=fromIso(s);d.setDate(d.getDate()+n);return iso(d)};
+let state={v:1,cat:SEED.map(x=>({...x})),days:{}};
+let cur=iso(new Date());
+let editing=false,showAll=true,ref=null,writing=Promise.resolve(),timer=null,where='this browser only';
+const LS='capacity-tracker-v1';
+try{const raw=localStorage.getItem(LS);if(raw){const p=JSON.parse(raw);if(p&&p.cat&&p.days)state=p}}catch(e){}
+const day=s=>state.days[s]||(state.days[s]={wake:null,items:{},low:[],well:[],note:''});
+const peek=s=>state.days[s];
+const item=id=>state.cat.find(c=>c.id===id);
+function calc(d){let wake=0,dr=0,rs=0,low=0,well=0;if(!d)return{wake,dr,rs,net:0,low,well,gross:0};wake=d.wake||0;for(const [id,v] of Object.entries(d.items||{})){const c=item(id);if(!c)continue;const pts=c.cost*v.n*mul(v);if(c.kind==='d')dr+=pts;else rs+=pts}low=(d.low||[]).length;well=(d.well||[]).length;dr=Math.round(dr);rs=Math.round(rs);const gross=wake+dr;return{wake,dr,rs,gross,net:Math.max(0,gross-rs),low,well}}
+const logged=d=>d&&(d.wake!==null||Object.keys(d.items||{}).length||(d.low||[]).length||(d.well||[]).length);
+const mul=v=>v.adj!=null?v.adj:mul(v);
+const wordFor=n=>n>=100?'Over capacity':n>=70?'Nearly drained':n>=40?'Getting low':'Plenty left';
+function save(){try{localStorage.setItem(LS,JSON.stringify(state))}catch(e){}clearTimeout(timer);if(!ref)return;timer=setTimeout(()=>{const body={state:JSON.parse(JSON.stringify(state)),saved:new Date().toISOString()};writing=writing.then(()=>ref.set(body)).then(()=>setStatus('Saved to your account.')).catch(e=>setStatus(e&&e.code==='quota_exceeded'?'Your record is too large to save to your account. It is saved in this browser only.':'Could not save to your account just now. Saved in this browser only.'))},900)}
+function setStatus(t){$('status').textContent=t}
+function chips(kind,cats,box){const items=state.cat.filter(c=>c.kind===kind&&(editing||c.show));const d=peek(cur);let h='';for(const [k,label] of Object.entries(cats)){const g=items.filter(c=>c.cat===k);if(!g.length)continue;h+='<div class="grp">'+esc(label)+'</div><div class="chips">'+g.map(c=>{const on=d&&d.items[c.id];if(editing)return '<button class="chip edit" data-showtog="'+esc(c.id)+'" aria-pressed="'+(c.show?'true':'false')+'">'+(c.show?'\u2713 ':'+ ')+esc(c.name)+'</button>';return '<button class="chip" data-tog="'+esc(c.id)+'" aria-pressed="'+(on?'true':'false')+'">'+esc(c.name)+'<small>'+(kind==='d'?'+':'−')+c.cost+'</small></button>'}).join('')+'</div>'}$(box).innerHTML=h||'<p class="mut">Nothing on your list yet. Tap Edit my list to add items.</p>'}
+function renderToday(){const d=peek(cur),r=calc(d);const t=new Date();$('dayname').textContent=cur===iso(t)?'Today':fromIso(cur).toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'long'});$('total').textContent=r.net;$('word').textContent=logged(d)?wordFor(r.net):'Nothing recorded yet';$('word').style.color=r.net>=70?'var(--dr)':'var(--ind)';$('vWake').textContent=r.wake;$('vDr').textContent='+'+r.dr;$('vRs').textContent='−'+r.rs;const sc=Math.max(100,r.gross);const pc=x=>(x/sc*100)+'%';$('sWake').style.left='0';$('sWake').style.width=pc(r.wake);$('sDr').style.left=pc(r.wake);$('sDr').style.width=pc(r.dr);$('sRs').style.left=pc(r.net);$('sRs').style.width=pc(r.gross-r.net);$('cap').style.left='calc('+pc(100)+' - 3px)';$('cap').style.display=sc>100?'block':'none';$('wakes').innerHTML=[0,10,20,30,40,50,60,70,80,90,100].map(v=>'<button data-wake="'+v+'" aria-pressed="'+(d&&d.wake===v?'true':'false')+'">'+v+'</button>').join('');$('editBtn').textContent=editing?'Done':'Edit my list';$('editHelp').textContent=editing?'Tap an item to add it to or remove it from your daily list. Ticked items show on this page.':'';chips('d',DC,'dChips');chips('r',RC,'rChips');const rows=d?Object.entries(d.items).map(([id,v])=>({c:item(id),v,id})).filter(x=>x.c):[];$('todayTbl').innerHTML=rows.length?'<h3>Today’s list</h3><div class="scroll"><table><thead><tr><th>Item</th><th>Times</th><th>Today it hit</th><th class="n">Points</th></tr></thead><tbody>'+rows.map(x=>'<tr><td>'+esc(x.c.name)+'</td><td><span class="step"><button data-dec="'+esc(x.id)+'" aria-label="One fewer">−</button><span class="num">'+x.v.n+'</span><button data-inc="'+esc(x.id)+'" aria-label="One more">+</button></span></td><td><span class="seg3">'+[[0.5,'Softer'],[1,'Usual'],[1.5,'Harder']].map(([m,l])=>'<button data-adj="'+esc(x.id)+'|'+m+'" aria-pressed="'+(mul(x.v)===m?'true':'false')+'">'+l+'</button>').join('')+'</span></td><td class="n">'+(x.c.kind==='d'?'+':'−')+Math.round(x.c.cost*x.v.n*mul(x.v))+'</td></tr>').join('')+'</tbody></table></div><p class="small mut">Softer counts an item at half its usual rating, and harder at one and a half times, for today only.</p>':'';$('note').value=d?d.note:''}
+function renderCheck(){const d=peek(cur),r=calc(d);let h='';for(const [g,list] of Object.entries(LOW)){h+='<div class="grp">'+esc(g)+'</div><div class="checks">'+list.map(s=>'<label><input type="checkbox" data-low="'+esc(s)+'" '+(d&&d.low.includes(s)?'checked':'')+'>'+esc(s)+'</label>').join('')+'</div>'}$('lowList').innerHTML=h;$('wellList').innerHTML=WELL.map(s=>'<label><input type="checkbox" data-well="'+esc(s)+'" '+(d&&d.well.includes(s)?'checked':'')+'>'+esc(s)+'</label>').join('');let m='';if(r.low>=5&&r.net<50)m='Your check-in shows '+r.low+' signs of running low, but today’s load is only '+r.net+'. Is something missing from today’s list, or rated too low in your catalogue?';else if(r.net>=80&&r.well>=6&&r.low<=1)m='Today’s load is '+r.net+', but your check-in looks well. Some ratings may be set higher than they cost you.';$('calib').innerHTML=m?'<div class="note">'+esc(m)+'</div>':''}
+function renderCat(){const q=$('search').value.trim().toLowerCase();const blocks=[['d',DC,'What costs me'],['r',RC,'What gives back']];let h='';for(const [kind,cats,title] of blocks){h+='<h3>'+title+'</h3><div class="scroll"><table class="cat-tbl"><thead><tr><th>Item</th><th class="n">Rating</th><th>Show</th><th></th></tr></thead><tbody>';for(const [k,label] of Object.entries(cats)){const g=state.cat.filter(c=>c.kind===kind&&c.cat===k&&(!q||c.name.toLowerCase().includes(q))&&(showAll||q||c.show));if(!g.length)continue;h+='<tr><td colspan="4" class="grp">'+esc(label)+'</td></tr>'+g.map(c=>'<tr><td><input type="text" value="'+esc(c.name)+'" data-name="'+esc(c.id)+'" aria-label="Item name" style="width:100%"></td><td class="n"><input type="number" min="1" max="100" value="'+c.cost+'" data-cost="'+esc(c.id)+'" aria-label="Rating 1 to 100"></td><td><input type="checkbox" data-show="'+esc(c.id)+'" '+(c.show?'checked':'')+' aria-label="Show on Today page"></td><td><button data-del="'+esc(c.id)+'" aria-label="Remove item">Remove</button></td></tr>').join('')}h+='</tbody></table></div>'}$('catBody').innerHTML=h;$('showAll').textContent=showAll?'Show only my items':'Show everything'}
+function sample(){const out=[];const base=iso(new Date());const pat=[[30,62,15,4,3],[20,45,20,2,6],[40,70,10,7,2],[30,55,25,3,5],[50,64,8,8,1],[10,30,35,1,8],[20,48,18,3,4],[30,58,12,5,3],[40,66,10,6,2],[60,52,20,9,1],[20,40,30,2,7],[30,61,15,4,3],[40,75,10,8,1],[30,50,22,4,4]];pat.forEach((p,i)=>{const gross=p[0]+p[1];out.push({date:addDays(base,i-13),wake:p[0],dr:p[1],rs:p[2],gross,net:Math.max(0,gross-p[2]),low:p[3],well:p[4]})});return out}
+function series(){const base=iso(new Date());const out=[];for(let i=13;i>=0;i--){const s=addDays(base,-i);const d=peek(s);out.push({date:s,on:!!logged(d),...calc(d)})}return out}
+function renderRecord(){const real=Object.values(state.days).some(logged);const data=real?series():sample().map(x=>({...x,on:true}));$('recSub').textContent=real?'End-of-day load for the last 14 days. Grey days were not recorded.':'Sample fortnight shown until you record your first day.';const on=data.filter(x=>x.on);const last7=on.filter(x=>x.date>=addDays(iso(new Date()),-6));const avg=a=>a.length?Math.round(a.reduce((s,x)=>s+x.net,0)/a.length):0;const over=on.filter(x=>x.net>=70).length;$('recTitle').textContent=on.length?'Average load over the last week: '+avg(last7.length?last7:on):'Record';$('recStats').innerHTML=[['Days recorded',on.length+' of 14'],['Average, last 7 days',avg(last7)],['Days at 70 or more',over],['Average low signs',on.length?(on.reduce((s,x)=>s+x.low,0)/on.length).toFixed(1):'0']].map(([a,b])=>'<div class="stat k-rs"><span class="small mut">'+a+'</span><b>'+b+'</b></div>').join('');draw(data);const tally={};if(real){for(const x of data){const d=peek(x.date);if(!d)continue;for(const [id,v] of Object.entries(d.items)){const c=item(id);if(!c||c.kind!=='d')continue;tally[c.name]=(tally[c.name]||0)+c.cost*v.n*mul(v)}}}const top=Object.entries(tally).sort((a,b)=>b[1]-a[1]).slice(0,6);const mx=top.length?top[0][1]:1;$('topList').innerHTML=top.length?top.map(([n,v])=>'<div style="margin:6px 0"><div style="display:flex;justify-content:space-between;gap:10px"><span>'+esc(n)+'</span><span class="num" style="white-space:nowrap">'+Math.round(v)+'</span></div><div style="height:10px;border-radius:5px;background:var(--dr);width:'+(v/mx*100)+'%"></div></div>').join(''):'<p class="mut">This fills in once you have recorded a few days.</p>'}
+let lastData=[];
+function draw(data){lastData=data||lastData;const s=$('chart');const W=s.clientWidth,H=s.clientHeight;if(!W||!H)return;const m={l:34,r:10,t:14,b:30};const iw=W-m.l-m.r,ih=H-m.t-m.b;const n=lastData.length;const top=Math.max(110,...lastData.map(x=>x.gross));const y=v=>m.t+ih-v/top*ih;const bw=iw/n;let g='';for(const t of [0,50,100]){g+='<line x1="'+m.l+'" x2="'+(W-m.r)+'" y1="'+y(t)+'" y2="'+y(t)+'" stroke="var(--line)" '+(t===100?'stroke-width="2" stroke-dasharray="5 4"':'')+'/><text x="'+(m.l-6)+'" y="'+(y(t)+4)+'" text-anchor="end">'+t+'</text>'}lastData.forEach((x,i)=>{const cx=m.l+i*bw;const w=Math.max(4,bw*.62);const x0=cx+(bw-w)/2;if(!x.on){g+='<rect x="'+x0+'" y="'+(y(4))+'" width="'+w+'" height="'+(y(0)-y(4))+'" fill="var(--line)"/>'}else{g+='<rect x="'+x0+'" y="'+y(x.wake)+'" width="'+w+'" height="'+(y(0)-y(x.wake))+'" fill="var(--wake)"/>';g+='<rect x="'+x0+'" y="'+y(x.net)+'" width="'+w+'" height="'+Math.max(0,y(x.wake)-y(x.net))+'" fill="'+(x.net>=70?'var(--dr)':'var(--ind)')+'"/>';if(W>=520)g+='<text x="'+(x0+w/2)+'" y="'+(y(x.net)-5)+'" text-anchor="middle">'+x.net+'</text>';for(let k=0;k<Math.min(x.low,10);k++)g+='<circle cx="'+(x0+w/2)+'" cy="'+(y(0)-6-k*7)+'" r="2.5" fill="var(--bg)"/>'}const d=fromIso(x.date);if(W>=520||i%2===0)g+='<text x="'+(cx+bw/2)+'" y="'+(H-10)+'" text-anchor="middle">'+d.getDate()+'</text>'});g+='<text x="'+(W-m.r)+'" y="'+(y(100)-6)+'" text-anchor="end">100, completely drained</text>';s.innerHTML=g}
+const ro=new ResizeObserver(()=>draw());ro.observe($('fig'));
+function csv(){const rows=[['date','woke_at','drains','restored','end_of_day','low_signs','well_signs','items','note']];for(const s of Object.keys(state.days).sort()){const d=state.days[s];if(!logged(d)&&!d.note)continue;const r=calc(d);const its=Object.entries(d.items).map(([id,v])=>{const c=item(id);return c?c.name+' x'+v.n+(mul(v)>1?' (harder)':mul(v)<1?' (softer)':''):''}).filter(Boolean).join('; ');rows.push([s,d.wake??'',r.dr,r.rs,r.net,r.low,r.well,its,d.note||''])}return rows.map(r=>r.map(v=>{const t=String(v);return /[",\n]/.test(t)?'"'+t.replace(/"/g,'""')+'"':t}).join(',')).join('\n')}
+function route(){const h=(location.hash||'#today').slice(1);const v=['today','checkin','catalogue','record','how'].includes(h)?h:'today';for(const s of document.querySelectorAll('section[data-view]'))s.classList.toggle('on',s.dataset.view===v);for(const a of $('nav').querySelectorAll('a'))a.setAttribute('aria-current',a.getAttribute('href')==='#'+v?'page':'false');render(v)}
+function render(v){v=v||(location.hash||'#today').slice(1);if(v==='checkin')renderCheck();else if(v==='catalogue')renderCat();else if(v==='record'){renderRecord();requestAnimationFrame(()=>draw())}else renderToday()}
+let dlgYes=null;function ask(t,fn){$('dlgText').textContent=t;dlgYes=fn;$('dlg').classList.add('on');$('dlgNo').focus()}
+$('dlgNo').onclick=()=>$('dlg').classList.remove('on');$('dlgYes').onclick=()=>{$('dlg').classList.remove('on');dlgYes&&dlgYes()};
+document.addEventListener('click',e=>{const t=e.target.closest('button');if(!t)return;const ds=t.dataset;if(t.id==='editBtn'){editing=!editing;renderToday()}else if(ds.showtog){const c=item(ds.showtog);c.show=!c.show;save();renderToday()}else if(ds.tog){const d=day(cur);if(d.items[ds.tog])delete d.items[ds.tog];else d.items[ds.tog]={n:1,adj:1};save();renderToday()}else if(ds.wake!==undefined){const d=day(cur);const v=+ds.wake;d.wake=d.wake===v?null:v;save();renderToday()}else if(ds.adj){const [id,m]=ds.adj.split('|');const v=day(cur).items[id];v.adj=+m;delete v.hard;save();renderToday()}else if(ds.inc){day(cur).items[ds.inc].n++;save();renderToday()}else if(ds.dec){const d=day(cur);const v=d.items[ds.dec];v.n--;if(v.n<=0)delete d.items[ds.dec];save();renderToday()}else if(ds.del){const c=item(ds.del);ask('Remove "'+(c?c.name:'')+'" from your catalogue? Past days that used it will no longer count it.',()=>{state.cat=state.cat.filter(x=>x.id!==ds.del);save();renderCat()})}});
+document.addEventListener('change',e=>{const t=e.target,ds=t.dataset;if(ds.low!==undefined||ds.well!==undefined){const d=day(cur);const k=ds.low!==undefined?'low':'well';const val=ds.low??ds.well;d[k]=t.checked?[...new Set([...d[k],val])]:d[k].filter(x=>x!==val);save();renderCheck()}else if(ds.cost){const c=item(ds.cost);const v=Math.min(100,Math.max(1,Math.round(+t.value||1)));c.cost=v;t.value=v;save()}else if(ds.name){const c=item(ds.name);const v=t.value.trim();if(v){c.name=v;save()}else t.value=c.name}else if(ds.show){item(ds.show).show=t.checked;save()}});
+$('note').addEventListener('input',e=>{day(cur).note=e.target.value;save()});
+$('search').addEventListener('input',renderCat);
+$('showAll').onclick=()=>{showAll=!showAll;renderCat()};
+$('addBtn').onclick=()=>{const n=$('newName').value.trim();if(!n){$('newName').focus();return}const kind=$('newKind').value;const cost=Math.min(100,Math.max(1,Math.round(+$('newCost').value||10)));state.cat.push({kind,cat:'own',id:'own-'+Date.now().toString(36),name:n,cost,show:true});$('newName').value='';save();renderCat()};
+$('resetBtn').onclick=()=>ask('Reset your catalogue to the starting list? Your own items and rating changes will be lost. Your recorded days are kept.',()=>{state.cat=SEED.map(x=>({...x}));save();renderCat()});
+$('prev').onclick=()=>{cur=addDays(cur,-1);render('today')};
+$('next').onclick=()=>{const t=iso(new Date());if(cur<t){cur=addDays(cur,1);render('today')}};
+$('gotoday').onclick=()=>{cur=iso(new Date());render('today')};
+$('copyBtn').onclick=async()=>{try{await navigator.clipboard.writeText(csv());$('expMsg').textContent='Copied.'}catch(e){$('expMsg').textContent='Copy was blocked by the browser.'}};
+const fileOut=(name,text,type)=>{const b=new Blob([text],{type});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)};
+$('dlBtn').onclick=()=>{fileOut('capacity-tracker-'+iso(new Date())+'.csv',csv(),'text/csv');$('expMsg').textContent='Downloaded.'};
+$('bkBtn').onclick=()=>{fileOut('capacity-tracker-backup-'+iso(new Date())+'.json',JSON.stringify(state),'application/json');$('expMsg').textContent='Backup downloaded. Keep it somewhere safe.'};
+$('rsFile').onchange=e=>{const f=e.target.files[0];if(!f)return;f.text().then(t=>{const p=JSON.parse(t);if(!p||!p.cat||!p.days)throw 0;ask('Replace everything on this device with the backup from '+f.name+'?',()=>{state=p;save();route();$('expMsg').textContent='Backup restored.'})}).catch(()=>{$('expMsg').textContent='That file is not a Capacity Tracker backup.'});e.target.value=''};
+window.addEventListener('hashchange',route);
+route();
+setStatus('Your entries are saved on this device only. Use Back up to keep a copy.');
+
+}
+</script>
+</body>
+</html>
