@@ -296,7 +296,7 @@ const simple=()=>state.who==='young';
 const sig=id=>state.signs.find(g=>g.id===id);
 function calc(d){let wake=0,dr=0,rs=0,low=0,well=0;if(!d)return{wake,dr,rs,net:0,low,well,gross:0};wake=d.wake||0;for(const [id,v] of Object.entries(d.items||{})){const c=item(id);if(!c)continue;const pts=costOf(c)*v.n*mul(v);if(c.kind==='d')dr+=pts;else rs+=pts}low=(d.low||[]).filter(sig).length;well=(d.well||[]).filter(sig).length;dr=Math.round(dr);rs=Math.round(rs);const gross=wake+dr;return{wake,dr,rs,gross,net:Math.max(0,gross-rs),low,well}}
 const logged=d=>d&&(d.wake!==null||Object.keys(d.items||{}).length||(d.low||[]).length||(d.well||[]).length);
-const mul=v=>v.adj!=null?v.adj:mul(v);
+const mul=v=>v.adj!=null?v.adj:(v.hard?1.5:1);
 const wordFor=n=>n>=100?'Over capacity':n>=70?'Nearly drained':n>=40?'Getting low':'Plenty left';
 function save(){try{localStorage.setItem(LS,JSON.stringify(state))}catch(e){}clearTimeout(timer);if(!ref)return;timer=setTimeout(()=>{const body={state:JSON.parse(JSON.stringify(state)),saved:new Date().toISOString()};writing=writing.then(()=>ref.set(body)).then(()=>setStatus('Saved to your account.')).catch(e=>setStatus(e&&e.code==='quota_exceeded'?'Your record is too large to save to your account. It is saved in this browser only.':'Could not save to your account just now. Saved in this browser only.'))},900)}
 function setStatus(t){$('status').textContent=t}
